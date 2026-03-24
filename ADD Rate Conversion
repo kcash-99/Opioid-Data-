@@ -1,0 +1,115 @@
+library(tidyverse)
+library(readxl)
+
+#------------------------------------------------------------
+# 1. Load Excel
+#------------------------------------------------------------
+
+file <- ###insert file path###
+sheets <- excel_sheets(file)
+dat_list <- lapply(sheets, function(s) read_excel(file, sheet = s))
+names(dat_list) <- sheets
+
+
+#------------------------------------------------------------
+# 2. ADD Lookup Table
+#------------------------------------------------------------
+
+add_lookup <- tribble(
+  ~County, ~ADD,
+  "Adair","Lake Cumberland","Allen","Barren River","Anderson","Bluegrass",
+  "Ballard","Purchase","Barren","Barren River","Bath","Gateway",
+  "Bell","Cumberland Valley","Boone","Northern Kentucky","Bourbon","Bluegrass",
+  "Boyd","FIVCO","Boyle","Bluegrass","Bracken","Buffalo Trace",
+  "Breathitt","Kentucky River","Breckinridge","Lincoln Trail","Bullitt","KIPDA",
+  "Butler","Green River","Caldwell","Pennyrile","Calloway","Purchase",
+  "Campbell","Northern Kentucky","Carlisle","Purchase","Carroll","KIPDA",
+  "Carter","FIVCO","Casey","Lake Cumberland","Christian","Pennyrile",
+  "Clark","Bluegrass","Clay","Cumberland Valley","Clinton","Lake Cumberland",
+  "Crittenden","Pennyrile","Cumberland","Lake Cumberland","Daviess","Green River",
+  "Edmonson","Barren River","Elliott","Gateway","Estill","Kentucky River",
+  "Fayette","Bluegrass","Fleming","Gateway","Floyd","Big Sandy",
+  "Franklin","Bluegrass","Fulton","Purchase","Gallatin","KIPDA",
+  "Garrard","Bluegrass","Grant","Northern Kentucky","Graves","Purchase",
+  "Grayson","Lincoln Trail","Green","Lincoln Trail","Greenup","FIVCO",
+  "Hancock","Green River","Hardin","Lincoln Trail","Harlan","Cumberland Valley",
+  "Harrison","Bluegrass","Hart","Lincoln Trail","Henderson","Green River",
+  "Henry","KIPDA","Hickman","Purchase","Hopkins","Pennyrile",
+  "Jackson","Cumberland Valley","Jefferson","KIPDA","Jessamine","Bluegrass",
+  "Johnson","Big Sandy","Kenton","Northern Kentucky","Knott","Kentucky River",
+  "Knox","Cumberland Valley","LaRue","Lincoln Trail","Laurel","Cumberland Valley",
+  "Lawrence","Big Sandy","Lee","Kentucky River","Leslie","Kentucky River",
+  "Letcher","Kentucky River","Lewis","Gateway","Lincoln","Bluegrass",
+  "Livingston","Pennyrile","Logan","Barren River","Lyon","Pennyrile",
+  "McCracken","Purchase","McCreary","Lake Cumberland","McLean","Green River",
+  "Madison","Bluegrass","Magoffin","Big Sandy","Marion","Lincoln Trail",
+  "Marshall","Purchase","Martin","Big Sandy","Mason","Buffalo Trace",
+  "Meade","Lincoln Trail","Menifee","Gateway","Mercer","Bluegrass",
+  "Metcalfe","Barren River","Monroe","Barren River","Montgomery","Gateway",
+  "Morgan","Gateway","Muhlenberg","Green River","Nelson","Lincoln Trail",
+  "Nicholas","Bluegrass","Ohio","Green River","Oldham","KIPDA",
+  "Owen","KIPDA","Owsley","Kentucky River","Pendleton","Northern Kentucky",
+  "Perry","Kentucky River","Pike","Big Sandy","Powell","Kentucky River",
+  "Pulaski","Lake Cumberland","Robertson","Buffalo Trace","Rockcastle","Cumberland Valley",
+  "Rowan","Gateway","Russell","Lake Cumberland","Scott","Bluegrass",
+  "Shelby","KIPDA","Simpson","Barren River","Spencer","KIPDA",
+  "Taylor","Lake Cumberland","Todd","Pennyrile","Trigg","Pennyrile",
+  "Trimble","KIPDA","Union","Green River","Warren","Barren River",
+  "Washington","Lincoln Trail","Wayne","Lake Cumberland","Webster","Green River",
+  "Whitley","Cumberland Valley","Wolfe","Kentucky River","Woodford","Bluegrass"
+)
+
+
+#------------------------------------------------------------
+# 3. PROCESS FUNCTION — FIX COUNTY NAMES + WEIGHTED ADD RATES
+#------------------------------------------------------------
+
+process_sheet <- function(df) {
+
+  df_clean <- df %>%
+    rename(County = 1) %>%          # first column is County
+    mutate(
+      County = str_to_title(str_trim(County)),  # FIX: ADAIR → Adair
+      `Drug Incidents` = suppressWarnings(as.numeric(`Drug Incidents`)),
+      Population       = suppressWarnings(as.numeric(Population))
+    )
+
+  # FIX special Mc* names
+  df_clean$County <- df_clean$County %>%
+    str_replace("^Mccracken$", "McCracken") %>%
+    str_replace("^Mccreary$", "McCreary") %>%
+    str_replace("^Mclean$", "McLean")
+
+  df_add <- df_clean %>%
+    left_join(add_lookup, by = "County")
+
+  df_add %>%
+    group_by(ADD) %>%
+    summarize(
+      ADD_Drug_Incidents = sum(`Drug Incidents`, na.rm = TRUE),
+      ADD_Population     = sum(Population, na.rm = TRUE),
+      ADD_Rate           = ADD_Drug_Incidents / ADD_Population,
+      SchoolYear         = "SY24-25",
+      .groups = "drop"
+    )
+}
+
+
+#------------------------------------------------------------
+# 4. APPLY TO ALL SHEETS AND SAVE
+#------------------------------------------------------------
+
+save_path <- ###insert file path###
+
+agg_list <- list()
+
+for (sheet in sheets) {
+
+  df <- dat_list[[sheet]] |> process_sheet()
+
+  agg_list[[sheet]] <- df
+
+  clean_name <- sheet |> str_replace_all(" ", "_")
+
+  write_csv(df, file.path(save_path, paste0(clean_name, "_ADD_Weighted_SY2425.csv")))
+}
