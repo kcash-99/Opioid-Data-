@@ -1,0 +1,115 @@
+library(tidyverse)
+library(readxl)
+library(janitor)
+
+#------------------------------------------------------------
+# 1. Load + Clean Column Names Safely
+#------------------------------------------------------------
+
+file <- "###file path name###"
+
+df <- read_excel(file) %>%
+  clean_names() %>%              # fixes weird headers, removes special chars
+  remove_empty("cols")           # removes blank unnamed columns
+
+
+# After clean_names(), new column names will be:
+# county
+# households_paying_rent
+# households_paying_30_0_or_more
+# percentage
+
+
+#------------------------------------------------------------
+# 2. ADD Lookup Table
+#------------------------------------------------------------
+
+add_lookup <- tribble(
+  ~County, ~ADD,
+  "Adair","Lake Cumberland","Allen","Barren River","Anderson","Bluegrass",
+  "Ballard","Purchase","Barren","Barren River","Bath","Gateway",
+  "Bell","Cumberland Valley","Boone","Northern Kentucky","Bourbon","Bluegrass",
+  "Boyd","FIVCO","Boyle","Bluegrass","Bracken","Buffalo Trace",
+  "Breathitt","Kentucky River","Breckinridge","Lincoln Trail","Bullitt","KIPDA",
+  "Butler","Green River","Caldwell","Pennyrile","Calloway","Purchase",
+  "Campbell","Northern Kentucky","Carlisle","Purchase","Carroll","KIPDA",
+  "Carter","FIVCO","Casey","Lake Cumberland","Christian","Pennyrile",
+  "Clark","Bluegrass","Clay","Cumberland Valley","Clinton","Lake Cumberland",
+  "Crittenden","Pennyrile","Cumberland","Lake Cumberland","Daviess","Green River",
+  "Edmonson","Barren River","Elliott","Gateway","Estill","Kentucky River",
+  "Fayette","Bluegrass","Fleming","Gateway","Floyd","Big Sandy",
+  "Franklin","Bluegrass","Fulton","Purchase","Gallatin","KIPDA",
+  "Garrard","Bluegrass","Grant","Northern Kentucky","Graves","Purchase",
+  "Grayson","Lincoln Trail","Green","Lincoln Trail","Greenup","FIVCO",
+  "Hancock","Green River","Hardin","Lincoln Trail","Harlan","Cumberland Valley",
+  "Harrison","Bluegrass","Hart","Lincoln Trail","Henderson","Green River",
+  "Henry","KIPDA","Hickman","Purchase","Hopkins","Pennyrile",
+  "Jackson","Cumberland Valley","Jefferson","KIPDA","Jessamine","Bluegrass",
+  "Johnson","Big Sandy","Kenton","Northern Kentucky","Knott","Kentucky River",
+  "Knox","Cumberland Valley","LaRue","Lincoln Trail","Laurel","Cumberland Valley",
+  "Lawrence","Big Sandy","Lee","Kentucky River","Leslie","Kentucky River",
+  "Letcher","Kentucky River","Lewis","Gateway","Lincoln","Bluegrass",
+  "Livingston","Pennyrile","Logan","Barren River","Lyon","Pennyrile",
+  "McCracken","Purchase","McCreary","Lake Cumberland","McLean","Green River",
+  "Madison","Bluegrass","Magoffin","Big Sandy","Marion","Lincoln Trail",
+  "Marshall","Purchase","Martin","Big Sandy","Mason","Buffalo Trace",
+  "Meade","Lincoln Trail","Menifee","Gateway","Mercer","Bluegrass",
+  "Metcalfe","Barren River","Monroe","Barren River","Montgomery","Gateway",
+  "Morgan","Gateway","Muhlenberg","Green River","Nelson","Lincoln Trail",
+  "Nicholas","Bluegrass","Ohio","Green River","Oldham","KIPDA",
+  "Owen","KIPDA","Owsley","Kentucky River","Pendleton","Northern Kentucky",
+  "Perry","Kentucky River","Pike","Big Sandy","Powell","Kentucky River",
+  "Pulaski","Lake Cumberland","Robertson","Buffalo Trace","Rockcastle","Cumberland Valley",
+  "Rowan","Gateway","Russell","Lake Cumberland","Scott","Bluegrass",
+  "Shelby","KIPDA","Simpson","Barren River","Spencer","KIPDA",
+  "Taylor","Lake Cumberland","Todd","Pennyrile","Trigg","Pennyrile",
+  "Trimble","KIPDA","Union","Green River","Warren","Barren River",
+  "Washington","Lincoln Trail","Wayne","Lake Cumberland","Webster","Green River",
+  "Whitley","Cumberland Valley","Wolfe","Kentucky River","Woodford","Bluegrass"
+)
+
+
+#------------------------------------------------------------
+# 3. Clean County Names + Calculate Weighted ADD Rates
+#------------------------------------------------------------
+
+hrcb_add <- df %>%
+  mutate(
+    county = str_to_title(str_trim(county)),
+    
+    # Fix special county names
+    county = case_when(
+      county == "Larue"     ~ "LaRue",
+      county == "Mccracken" ~ "McCracken",
+      county == "Mccreary"  ~ "McCreary",
+      county == "Mclean"    ~ "McLean",
+      TRUE ~ county
+    ),
+    
+    households_paying_rent =
+      suppressWarnings(as.numeric(households_paying_rent)),
+    
+    households_paying_30_0_or_more =
+      suppressWarnings(as.numeric(households_paying_30_0_or_more))
+  ) %>%
+  left_join(add_lookup, by = c("county" = "County")) %>%
+  filter(!is.na(ADD)) %>%
+  group_by(ADD) %>%
+  summarize(
+    ADD_Total_Renters = sum(households_paying_rent, na.rm = TRUE),
+    ADD_Total_30plus  = sum(households_paying_30_0_or_more, na.rm = TRUE),
+    ADD_HRCB_Rate     = ADD_Total_30plus / ADD_Total_Renters,
+    .groups = "drop"
+  )
+
+
+#------------------------------------------------------------
+# 4. Save Output
+#------------------------------------------------------------
+
+write_csv(
+  hrcb_add,
+  "###file path name###"
+)
+
+hrcb_add
