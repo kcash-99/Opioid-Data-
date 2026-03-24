@@ -1,0 +1,132 @@
+library(tidyverse)
+library(readxl)
+library(janitor)
+# ===========================================================
+# OFFICIAL, CORRECTED KENTUCKY ADD LOOKUP (DLG verified)
+# ===========================================================
+
+add_lookup <- tribble(
+  ~County, ~ADD,
+
+  # Purchase
+  "Ballard","Purchase","Carlisle","Purchase","Fulton","Purchase",
+  "Hickman","Purchase","Graves","Purchase","McCracken","Purchase",
+  "Marshall","Purchase","Calloway","Purchase",
+
+  # Pennyrile
+  "Caldwell","Pennyrile","Christian","Pennyrile","Crittenden","Pennyrile",
+  "Hopkins","Pennyrile","Livingston","Pennyrile","Lyon","Pennyrile",
+  "Muhlenberg","Pennyrile","Todd","Pennyrile","Trigg","Pennyrile",
+
+  # Green River
+  "Daviess","Green River","Hancock","Green River","Henderson","Green River",
+  "McLean","Green River","Ohio","Green River","Union","Green River",
+  "Webster","Green River",
+
+  # Barren River
+  "Allen","Barren River","Barren","Barren River","Butler","Barren River",
+  "Edmonson","Barren River","Hart","Barren River","Logan","Barren River",
+  "Metcalfe","Barren River","Monroe","Barren River","Simpson","Barren River",
+  "Warren","Barren River",
+
+  # Lincoln Trail
+  "Breckinridge","Lincoln Trail","Grayson","Lincoln Trail",
+  "Hardin","Lincoln Trail","LaRue","Lincoln Trail","Marion","Lincoln Trail",
+  "Meade","Lincoln Trail","Nelson","Lincoln Trail","Washington","Lincoln Trail",
+
+  # KIPDA
+  "Bullitt","KIPDA","Henry","KIPDA","Jefferson","KIPDA",
+  "Oldham","KIPDA","Shelby","KIPDA","Spencer","KIPDA","Trimble","KIPDA",
+
+  # Northern Kentucky
+  "Boone","Northern Kentucky","Campbell","Northern Kentucky",
+  "Carroll","Northern Kentucky","Gallatin","Northern Kentucky",
+  "Grant","Northern Kentucky","Kenton","Northern Kentucky",
+  "Owen","Northern Kentucky","Pendleton","Northern Kentucky",
+
+  # Buffalo Trace
+  "Bracken","Buffalo Trace","Fleming","Buffalo Trace",
+  "Lewis","Buffalo Trace","Mason","Buffalo Trace","Robertson","Buffalo Trace",
+
+  # Gateway
+  "Bath","Gateway","Menifee","Gateway","Montgomery","Gateway",
+  "Morgan","Gateway","Rowan","Gateway",
+
+  # FIVCO
+  "Boyd","FIVCO","Carter","FIVCO","Elliott","FIVCO",
+  "Greenup","FIVCO","Lawrence","FIVCO",
+
+  # Big Sandy
+  "Floyd","Big Sandy","Johnson","Big Sandy","Magoffin","Big Sandy",
+  "Martin","Big Sandy","Pike","Big Sandy",
+
+  # Kentucky River
+  "Breathitt","Kentucky River","Knott","Kentucky River",
+  "Lee","Kentucky River","Leslie","Kentucky River",
+  "Letcher","Kentucky River","Owsley","Kentucky River",
+  "Perry","Kentucky River","Wolfe","Kentucky River",
+
+  # Cumberland Valley
+  "Bell","Cumberland Valley","Clay","Cumberland Valley",
+  "Harlan","Cumberland Valley","Jackson","Cumberland Valley",
+  "Knox","Cumberland Valley","Laurel","Cumberland Valley",
+  "Rockcastle","Cumberland Valley","Whitley","Cumberland Valley",
+
+  # Lake Cumberland
+  "Adair","Lake Cumberland","Casey","Lake Cumberland","Clinton","Lake Cumberland",
+  "Cumberland","Lake Cumberland","Green","Lake Cumberland",
+  "McCreary","Lake Cumberland","Pulaski","Lake Cumberland",
+  "Russell","Lake Cumberland","Taylor","Lake Cumberland","Wayne","Lake Cumberland",
+
+  # Bluegrass
+  "Anderson","Bluegrass","Bourbon","Bluegrass","Boyle","Bluegrass",
+  "Clark","Bluegrass","Estill","Bluegrass","Fayette","Bluegrass",
+  "Franklin","Bluegrass","Garrard","Bluegrass","Harrison","Bluegrass",
+  "Jessamine","Bluegrass","Lincoln","Bluegrass","Madison","Bluegrass",
+  "Mercer","Bluegrass","Nicholas","Bluegrass","Powell","Bluegrass",
+  "Scott","Bluegrass","Woodford","Bluegrass"
+)
+
+# ===========================================================
+# FILE PATH, AGGREGATION
+# ===========================================================
+file <- "####file path name####"
+
+df <- read_excel(file) %>%
+  clean_names() %>%
+  remove_empty("cols") %>%
+  mutate(
+    county = str_to_title(str_trim(county)),
+    county = case_when(
+      county == "Larue" ~ "LaRue",
+      county == "Mccracken" ~ "McCracken",
+      county == "Mccreary" ~ "McCreary",
+      county == "Mclean" ~ "McLean",
+      TRUE ~ county
+    ),
+    under_19_pop = as.numeric(under_19_pop),
+    number_uninsured = as.numeric(number_uninsured),
+    number_insured = as.numeric(number_insured)
+  ) %>%
+  left_join(add_lookup, by = c("county" = "County"))
+
+health_add <- df %>%
+  filter(!is.na(ADD)) %>%
+  group_by(ADD) %>%
+  summarize(
+    ADD_U19_Pop = sum(under_19_pop, na.rm = TRUE),
+    ADD_Insured = sum(number_insured, na.rm = TRUE),
+    ADD_Uninsured = sum(number_uninsured, na.rm = TRUE),
+    ADD_Insured_Rate = ADD_Insured / ADD_U19_Pop,
+    ADD_Uninsured_Rate = ADD_Uninsured / ADD_U19_Pop,
+    .groups = "drop"
+  )
+# ===========================================================
+# SAVING TO COMPUTER
+# ===========================================================
+write_csv(
+  health_add,
+  "####file path name####"
+)
+
+health_add
