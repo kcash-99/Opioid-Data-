@@ -1,0 +1,136 @@
+library(readxl)
+library(dplyr)
+library(tidyr)
+library(writexl)
+
+# ------------------------------------------------------------
+# 1. Read your chronic absenteeism file
+# ------------------------------------------------------------
+file_path <- "#### file path ####"
+
+df <- read_excel(file_path)
+
+# Standardize column names
+df <- df %>%
+  rename(
+    County = County,
+    Chronic = `Chronically Absent`,
+    Population = `School Population`,
+    Percentage = Percentage
+  )
+
+# ------------------------------------------------------------
+# 2. Build County → ADD lookup table
+# ------------------------------------------------------------
+
+add_lookup <- tribble(
+  ~County, ~ADD,
+
+  # Purchase
+  "Ballard","Purchase","Carlisle","Purchase","Fulton","Purchase",
+  "Hickman","Purchase","Graves","Purchase","McCracken","Purchase",
+  "Marshall","Purchase","Calloway","Purchase",
+
+  # Pennyrile
+  "Caldwell","Pennyrile","Christian","Pennyrile","Crittenden","Pennyrile",
+  "Hopkins","Pennyrile","Livingston","Pennyrile","Lyon","Pennyrile",
+  "Muhlenberg","Pennyrile","Todd","Pennyrile","Trigg","Pennyrile",
+
+  # Green River
+  "Daviess","Green River","Hancock","Green River","Henderson","Green River",
+  "McLean","Green River","Ohio","Green River","Union","Green River",
+  "Webster","Green River",
+
+  # Barren River
+  "Allen","Barren River","Barren","Barren River","Butler","Barren River",
+  "Edmonson","Barren River","Hart","Barren River","Logan","Barren River",
+  "Metcalfe","Barren River","Monroe","Barren River","Simpson","Barren River",
+  "Warren","Barren River",
+
+  # Lincoln Trail
+  "Breckinridge","Lincoln Trail","Grayson","Lincoln Trail",
+  "Hardin","Lincoln Trail","LaRue","Lincoln Trail","Marion","Lincoln Trail",
+  "Meade","Lincoln Trail","Nelson","Lincoln Trail","Washington","Lincoln Trail",
+
+  # KIPDA
+  "Bullitt","KIPDA","Henry","KIPDA","Jefferson","KIPDA",
+  "Oldham","KIPDA","Shelby","KIPDA","Spencer","KIPDA","Trimble","KIPDA",
+
+  # Northern Kentucky
+  "Boone","Northern Kentucky","Campbell","Northern Kentucky",
+  "Carroll","Northern Kentucky","Gallatin","Northern Kentucky",
+  "Grant","Northern Kentucky","Kenton","Northern Kentucky",
+  "Owen","Northern Kentucky","Pendleton","Northern Kentucky",
+
+  # Buffalo Trace
+  "Bracken","Buffalo Trace","Fleming","Buffalo Trace",
+  "Lewis","Buffalo Trace","Mason","Buffalo Trace","Robertson","Buffalo Trace",
+
+  # Gateway
+  "Bath","Gateway","Menifee","Gateway","Montgomery","Gateway",
+  "Morgan","Gateway","Rowan","Gateway",
+
+  # FIVCO
+  "Boyd","FIVCO","Carter","FIVCO","Elliott","FIVCO",
+  "Greenup","FIVCO","Lawrence","FIVCO",
+
+  # Big Sandy
+  "Floyd","Big Sandy","Johnson","Big Sandy","Magoffin","Big Sandy",
+  "Martin","Big Sandy","Pike","Big Sandy",
+
+  # Kentucky River
+  "Breathitt","Kentucky River","Knott","Kentucky River",
+  "Lee","Kentucky River","Leslie","Kentucky River",
+  "Letcher","Kentucky River","Owsley","Kentucky River",
+  "Perry","Kentucky River","Wolfe","Kentucky River",
+
+  # Cumberland Valley
+  "Bell","Cumberland Valley","Clay","Cumberland Valley",
+  "Harlan","Cumberland Valley","Jackson","Cumberland Valley",
+  "Knox","Cumberland Valley","Laurel","Cumberland Valley",
+  "Rockcastle","Cumberland Valley","Whitley","Cumberland Valley",
+
+  # Lake Cumberland
+  "Adair","Lake Cumberland","Casey","Lake Cumberland","Clinton","Lake Cumberland",
+  "Cumberland","Lake Cumberland","Green","Lake Cumberland",
+  "McCreary","Lake Cumberland","Pulaski","Lake Cumberland",
+  "Russell","Lake Cumberland","Taylor","Lake Cumberland","Wayne","Lake Cumberland",
+
+  # Bluegrass
+  "Anderson","Bluegrass","Bourbon","Bluegrass","Boyle","Bluegrass",
+  "Clark","Bluegrass","Estill","Bluegrass","Fayette","Bluegrass",
+  "Franklin","Bluegrass","Garrard","Bluegrass","Harrison","Bluegrass",
+  "Jessamine","Bluegrass","Lincoln","Bluegrass","Madison","Bluegrass",
+  "Mercer","Bluegrass","Nicholas","Bluegrass","Powell","Bluegrass",
+  "Scott","Bluegrass","Woodford","Bluegrass"
+)
+
+# ------------------------------------------------------------
+# 3. Merge your data with ADD lookup
+# ------------------------------------------------------------
+
+df_add <- df %>%
+  left_join(add_lookup, by = "County")
+
+# ------------------------------------------------------------
+# 4. Aggregate chronic absenteeism up to ADD level
+# ------------------------------------------------------------
+
+add_summary <- df_add %>%
+  group_by(ADD) %>%
+  summarise(
+    total_population = sum(Population, na.rm = TRUE),
+    total_chronic_absent = sum(Chronic, na.rm = TRUE),
+    chronic_absence_rate = total_chronic_absent / total_population
+  ) %>%
+  ungroup()
+
+# ------------------------------------------------------------
+# 5. Save to your folder
+# ------------------------------------------------------------
+
+output_path <- "#### file path #####"
+
+write_xlsx(add_summary, output_path)
+
+print(paste("File saved to:", output_path))
